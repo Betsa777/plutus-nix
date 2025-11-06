@@ -49,7 +49,7 @@ common common-all-tests
       plutus-ledger-api
     default-language: Haskell2010
 
-library 
+library
     import:            common-all
     hs-source-dirs:    lecture
     exposed-modules:
@@ -59,19 +59,23 @@ library
       Mint
       ParameterizedVesting
       Vesting
+      AMM
     build-depends:
-      base >=4.14 && <5,      
+      base >=4.14 && <5,
       time,
       bytestring
     default-language: Haskell2010
 
-executable vesting-exe
+-- executable vesting-exe
+executable amm-exe
     main-is:            Main.hs
-    hs-source-dirs:     tests
+    --hs-source-dirs:     tests
+    hs-source-dirs: lecture
     build-depends:
         base >=4.14 && <4.15,
         plutus-ledger-api,
         plutus-tx,
+        plutus-tx-plugin,
         wspace,
         utilities
     default-language:   Haskell2010
@@ -83,7 +87,8 @@ test-suite wspace-tests
     main-is:             Spec.hs
     build-depends:
       wspace,
-      utilities
+      utilities,
+      hspec
     other-modules:
       CGPlutusUtilsSpec
       CGTimeSpec
