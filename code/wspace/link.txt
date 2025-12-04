@@ -1,0 +1,1 @@
+https://github.com/wimsio/plutus-nix/blob/main/code/wspace/lecture/boilerPlate/validators/amm.md

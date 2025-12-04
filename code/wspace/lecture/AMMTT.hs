@@ -7,7 +7,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module AMM where
+module AMMTT where
 
 -- import Plutus.V1.Ledger.Api ()
 
@@ -54,8 +54,6 @@ type Amount = Integer
 
 type LPTokenNumber = Integer
 
-type AdaReserve = Integer
-
 type TokenReserve = Integer
 
 type TokenSymbol = CurrencySymbol
@@ -65,9 +63,9 @@ type LPTokenCurrencySymbol = CurrencySymbol
 type LPTokenName = TokenName
 
 data AMMRedeemer
-  = AddLiquidity Amount Amount AdaReserve TokenReserve LPTokenNumber LPPKH LPTokenCurrencySymbol LPTokenName
-  | Swap Amount Amount AdaReserve TokenReserve TokenSymbol TokenSymbol
-  | RemoveLiquidity Amount AdaReserve TokenReserve LPTokenNumber LPTokenCurrencySymbol LPTokenName TokenSymbol TokenName -- retrieve ada and Token based on the token Amount
+  = AddLiquidity Amount Amount TokenReserve TokenReserve LPTokenNumber LPPKH LPTokenCurrencySymbol LPTokenName
+  | Swap Amount Amount TokenReserve TokenReserve TokenSymbol
+  | RemoveLiquidity TokenA TokenB Amount LPPKH
   deriving stock (Show, Generic)
 
 PlutusTx.makeIsDataIndexed
@@ -81,12 +79,10 @@ PlutusTx.makeIsDataIndexed
 ammValidator :: AMMRedeemer -> ScriptContext -> Bool
 ammValidator r ctx =
   case r of
-    AddLiquidity adaAmount tokenAmount adaR tokR lpTokNumb lpPKH lpCurrSymb lpTokName ->
-      P.traceIfFalse "AddLiquidty fails" (addLiquidity adaAmount tokenAmount adaR tokR lpTokNumb lpPKH lpCurrSymb lpTokName ctx)
-    Swap amount minAmount adaR tokR tokSymbolIn tokSymbolOut ->
-      P.traceIfFalse "Swap fails" (swap amount minAmount adaR tokR tokSymbolIn tokSymbolOut ctx)
-    RemoveLiquidity amount adaR tokR lpTokNumb lpTokSymb lpTokName tokSymb tokName ->
-      P.traceIfFalse "RemoveLiquidity failed" (removeLiquidity amount adaR tokR lpTokNumb lpTokSymb lpTokName tokSymb tokName ctx)
+    AddLiquidity amount1 amount2 tok1R tok2R lpTokNumb lpPKH lpCurrSymb lpTokName ->
+      P.traceIfFalse "AddLiquidty fails" (addLiquidity amount1 amount2 tok1R tok2R lpTokNumb lpPKH lpCurrSymb lpTokName ctx)
+    Swap amount minAmount adaR tokR tokSymbol ->
+      P.traceIfFalse "Swap fails" (swap amount minAmount tok1R tokR tokSymbol ctx)
 
 -- Swap tA tB amount owner ->
 --   P.traceIfFalse "Swap fails" (swap tA tB amount owner ctx)
@@ -96,9 +92,9 @@ ammValidator r ctx =
 -- ajout de liquidité
 
 {-# INLINEABLE addLiquidity #-}
-addLiquidity :: Amount -> Amount -> AdaReserve -> TokenReserve -> LPTokenNumber -> LPPKH -> LPTokenCurrencySymbol -> LPTokenName -> ScriptContext -> Bool
-addLiquidity adaAmount tokenAmount adaR tokR lpTokNumb lpPKH lpCurrSymb lpTokName ctx =
-  if adaAmount <= 0 || tokenAmount <= 0
+addLiquidity :: Amount -> Amount -> TokenReserve -> TokenReserve -> LPTokenNumber -> LPPKH -> LPTokenCurrencySymbol -> LPTokenName -> ScriptContext -> Bool
+addLiquidity amount1 amount2 tok1R tok2R lpTokNumb lpPKH lpCurrSymb lpTokName ctx =
+  if amount1 <= 0 || amount2 <= 0
     then False
     else
       -- au cas ou il n'ya pas de reserve du token ajouté
@@ -134,9 +130,9 @@ finalizeAdding adaR tokR adaAmount tokenAmount tokensForLp lpPKH lpCurrSymb lpTo
       -- ownerOuput correspond à l'output correspondant
       -- a celui dans lequel le LP a recu les LP tokens ou tokensForLp
       -- --verifier plutot dans le mint
-     -- mint = txInfoMint (scriptContextTxInfo ctx)
-     -- ownerMinted = valueOf mint lpCurrSymb lpTokName == tokensForLp
-   in -- ownerMinted =--
+      mint = txInfoMint (scriptContextTxInfo ctx)
+      ownerMinted = valueOf  mint lpCurrSymb lpTokName == tokensForLp
+      -- ownerMinted =
       --   P.any
       --     ( \o ->
       --         ((valueOf (txOutValue o) lpCurrSymb lpTokName) == tokensForLp)
@@ -146,28 +142,27 @@ finalizeAdding adaR tokR adaAmount tokenAmount tokensForLp lpPKH lpCurrSymb lpTo
       --                )
       --     )
       --     (txInfoOutputs (scriptContextTxInfo ctx))
-      (scriptOuput1 P.&& scriptOuput2 )
-      --P.&& ownerMinted
+   in (scriptOuput1 P.&& scriptOuput2 P.&& ownerMinted)
 
 -- swap part
 {-# INLINEABLE swap #-}
 -- Take 1% on each swap
 -- Before swap we must verify off-chain if there is enough of tokens for the
 -- swap
-swap :: Amount -> Amount -> AdaReserve -> TokenReserve -> TokenSymbol -> TokenSymbol -> ScriptContext -> Bool
+swap :: Amount -> Amount -> AdaReserve -> TokenReserve -> TokenSymbol -> ScriptContext -> Bool
 -- amount -> amount to swap
 -- minAmount -> minimum token expected
 -- tokSymbol == adaSymbol -> that mean the user want to swap ada to token
-swap amount minAmount adaR tokR tokSymbolInp tokSymbolOutp ctx =
+swap amount minAmount adaR tokR tokSymbol ctx =
   P.and conditions
   where
     -- swaps ada with tokens
 
     conditions :: [Bool]
     conditions =
-      [ userInput amount tokSymbolInp ctx,
-        userOutput amount minAmount adaR tokR tokSymbolInp tokSymbolOutp ctx,
-        scriptOutput amount adaR tokR tokSymbolInp tokSymbolOutp ctx
+      [ userInput amount tokSymbol ctx,
+        userOutput amount minAmount adaR tokR tokSymbol ctx,
+        scriptOutput amount adaR tokR tokSymbol ctx
       ]
     -- tokSymbol can be adaSymbol or the TokenSymbol. It depends on what user wants to swap.
     userInput :: Amount -> TokenSymbol -> ScriptContext -> Bool
@@ -188,9 +183,9 @@ swap amount minAmount adaR tokR tokSymbolInp tokSymbolOutp ctx =
             )
             inputs
 
-    userOutput :: Amount -> Amount -> AdaReserve -> TokenReserve -> TokenSymbol -> TokenSymbol -> ScriptContext -> Bool
-    userOutput amount minAmount adaR tokR tokSymbolI tokSymbolO ctx =
-      case tokSymbolI P.== adaSymbol of
+    userOutput :: Amount -> Amount -> AdaReserve -> TokenReserve -> TokenSymbol -> ScriptContext -> Bool
+    userOutput amount minAmount adaR tokR tokSymbol ctx =
+      case tokSymbol P.== adaSymbol of
         True ->
           let tokensBougth = adaToToken amount adaR tokR
               pkh = P.head $ txInfoSignatories (scriptContextTxInfo ctx)
@@ -202,7 +197,7 @@ swap amount minAmount adaR tokR tokSymbolInp tokSymbolOutp ctx =
                   P.any
                     ( \o ->
                         P.any
-                          (\(cs, _, am) -> (cs P.== tokSymbolO) P.&& (am P.== tokensBougth))
+                          (\(cs, _, am) -> (cs P./= adaSymbol) P.&& (am P.== tokensBougth))
                           (flattenValue $ txOutValue $ o)
                           P.&& ( case addressCredential (txOutAddress o) of
                                    PubKeyCredential userPKH -> userPKH P.== pkh
@@ -220,22 +215,19 @@ swap amount minAmount adaR tokR tokSymbolInp tokSymbolOutp ctx =
                 else
                   P.any
                     ( \o ->
-                        let receivedAda = valueOf (txOutValue o) adaSymbol adaToken
-                         in receivedAda
-                              P.>= minAmount
-                              P.&& receivedAda
-                              P.<= adaBougth
-                              P.&& ( case addressCredential (txOutAddress o) of
-                                       PubKeyCredential pkh -> pkh == userPKH
-                                       _ -> False
-                                   )
+                        valueOf (txOutValue o) adaSymbol adaToken
+                          P.== adaBougth
+                          P.&& ( case addressCredential (txOutAddress o) of
+                                   PubKeyCredential pkh -> pkh == userPKH
+                                   _ -> False
+                               )
                     )
                     (txInfoOutputs (scriptContextTxInfo ctx))
 
-    scriptOutput :: Amount -> AdaReserve -> TokenReserve -> TokenSymbol -> TokenSymbol -> ScriptContext -> Bool
-    scriptOutput amount adaR tokR tokSymbolIn tokSymbolOut ctx =
+    scriptOutput :: Amount -> AdaReserve -> TokenReserve -> TokenSymbol -> ScriptContext -> Bool
+    scriptOutput amount adaR tokR tokSymbol ctx =
       case getContinuingOutputs ctx of
-        [o] -> case tokSymbolIn P.== adaSymbol of
+        [o] -> case tokSymbol P.== adaSymbol of
           True ->
             let tokensBougth = adaToToken amount adaR tokR
                 -- update the ada's reserve because it swap ada and get tokens
@@ -243,7 +235,7 @@ swap amount minAmount adaR tokR tokSymbolInp tokSymbolOutp ctx =
                 adaReserveUpdate = valueOf (txOutValue o) adaSymbol adaToken P.== adaR P.+ amount
                 tokenReserveUpdate =
                   P.any
-                    (\(cs, _, am) -> (cs P.== tokSymbolOut) P.&& (am P.== tokR P.- tokensBougth))
+                    (\(cs, _, am) -> (cs P./= adaSymbol) P.&& (am P.== tokR P.- tokensBougth))
                     (flattenValue $ txOutValue $ o)
              in adaReserveUpdate P.&& tokenReserveUpdate
           False ->
@@ -253,8 +245,7 @@ swap amount minAmount adaR tokR tokSymbolInp tokSymbolOutp ctx =
                 adaReserveUpdate = valueOf (txOutValue o) adaSymbol adaToken P.== adaR P.- adaBougth
                 tokenReserveUpdate =
                   P.any
-                    -- tokSymbolIn correspond ici au token qu'on echange
-                    (\(cs, _, am) -> (cs P.== tokSymbolIn) P.&& (am P.== tokR P.+ amount))
+                    (\(cs, _, am) -> (cs P./= adaSymbol) P.&& (am P.== tokR P.+ amount))
                     (flattenValue $ txOutValue $ o)
              in adaReserveUpdate P.&& tokenReserveUpdate
         _ -> False
@@ -273,84 +264,12 @@ tokenToAda amount tokR adaR =
 
 {-# INLINEABLE getAmountForSwp #-}
 -- get 1% of fee on each swap
--- x*y=k
--- (x+dx) * (y-dy) = k
 getAmountForSwp :: Amount -> Amount -> Amount -> Amount
 getAmountForSwp inputAmount inputReserve outputReserve =
   let inputAmountWithFee = inputAmount P.* 99
       numerator = inputAmountWithFee * outputReserve
       denominator = (inputReserve P.* 100) P.+ inputAmountWithFee
    in P.divide numerator denominator
-
--- Remove liquidity part
-{-# INLINEABLE removeLiquidity #-}
-removeLiquidity :: Amount -> AdaReserve -> TokenReserve -> LPTokenNumber -> LPTokenCurrencySymbol -> LPTokenName -> TokenSymbol -> TokenName -> ScriptContext -> Bool
-removeLiquidity amount adaR tokR lpTokNumb lpTokSymb lpTokName tokSymb tokName ctx =
-  if amount <= 0
-    then False
-    else P.and removingConditions
-  where
-    removingConditions :: [Bool]
-    removingConditions =
-      [ -- Verify that LP have the expected lptokens number
-        --lpInput amount lpTokSymb lpTokName ctx
-        --lpOutput amount adaR tokR lpTokNumb lpTokSymb lpTokName tokSymb tokName ctx,
-        --scriptOutput amount adaR tokR lpTokNumb lpTokSymb lpTokName tokSymb tokName ctx
-      ]
-
-    lpInput :: Amount -> LPTokenCurrencySymbol -> LPTokenName -> ScriptContext -> Bool
-    lpInput am lpTokSyb lpTokN ctx =
-      let userPKH = P.head $ txInfoSignatories (scriptContextTxInfo ctx)
-          inputs = txInfoInputs $ scriptContextTxInfo ctx
-       in P.any
-            ( \inp ->
-                case addressCredential (txOutAddress $ txInInfoResolved inp) of
-                  PubKeyCredential pkh ->
-                    pkh
-                      == userPKH
-                      P.&& valueOf (txOutValue $ txInInfoResolved inp) lpTokSyb lpTokN
-                      >= am
-            )
-            inputs
-
-    lpOutput :: Amount -> AdaReserve -> TokenReserve -> LPTokenNumber -> LPTokenCurrencySymbol -> LPTokenName -> TokenSymbol -> TokenName -> ScriptContext -> Bool
-    lpOutput am adaReserve tokReserve lpTokNb lpTokSymb lpTokName tokSyb tokN ctx =
-      let (adaAmountToReceive, tokenAmountToReceive) = calculateLiquidty amount adaReserve tokReserve lpTokNb
-          userPKH = P.head $ txInfoSignatories (scriptContextTxInfo ctx)
-          outputs = txInfoOutputs (scriptContextTxInfo ctx)
-          minted = txInfoMint (scriptContextTxInfo ctx)
-          goodLpTokAmountBurned = valueOf (minted) lpTokSymb lpTokName P.== P.negate am
-          goodAdaAndTokenAmountReceived =
-            P.any
-              ( \o ->
-                  valueOf (txOutValue o) adaSymbol adaToken
-                    P.<= adaAmountToReceive
-                    P.&& valueOf (txOutValue o) tokSyb tokN
-                    P.<= tokenAmountToReceive
-                    P.&& ( case addressCredential (txOutAddress o) of
-                             PubKeyCredential pkh -> userPKH P.== pkh
-                             _ -> False
-                         )
-              )
-              outputs
-       in goodLpTokAmountBurned P.&& goodAdaAndTokenAmountReceived
-
-    scriptOutput :: Amount -> AdaReserve -> TokenReserve -> LPTokenNumber -> LPTokenCurrencySymbol -> LPTokenName -> TokenSymbol -> TokenName -> ScriptContext -> Bool
-    scriptOutput amount adaReserve tokReserve lpTokNb lpTokSymb lpTokName tokSymb tokName ctx =
-      case getContinuingOutputs ctx of
-        [o] ->
-          let (adaAmountReceived, tokenAmountReceived) = calculateLiquidty amount adaReserve tokReserve lpTokNb
-              adaReserveUpdated = valueOf (txOutValue o) adaSymbol adaToken P.== adaReserve P.- adaAmountReceived
-              tokenReserveUpdated = valueOf (txOutValue o) tokSymb tokName P.== tokReserve P.- tokenAmountReceived
-           in adaReserveUpdated P.&& tokenReserveUpdated
-        _ -> False
-
-{-# INLINEABLE calculateLiquidty #-}
-calculateLiquidty :: Amount -> AdaReserve -> TokenReserve -> LPTokenNumber -> (Amount, Amount)
-calculateLiquidty amount adaR tokR lpTokNumb =
-  let adaAmount = P.divide (adaR P.* amount) lpTokNumb
-      tokenAmount = P.divide (tokR P.* amount) lpTokNumb
-   in (adaAmount, tokenAmount)
 
 --
 {-# INLINEABLE ammUntypedValidator #-}

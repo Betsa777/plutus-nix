@@ -53,13 +53,18 @@ library
     import:            common-all
     hs-source-dirs:    lecture
     exposed-modules:
-      CGPlutusUtilsv1
-      CGTime
-      Demo
-      Mint
-      ParameterizedVesting
-      Vesting
+      -- CGPlutusUtilsv1
+      -- CGTime
+      -- Demo
+      -- Mint
+      -- ParameterizedVesting
+      -- Vesting
       AMM
+      --Mint
+      -- AMMU
+      --AlwaysS
+       --DatRed
+       NFTMarketPlace
     build-depends:
       base >=4.14 && <5,
       time,
@@ -67,7 +72,7 @@ library
     default-language: Haskell2010
 
 -- executable vesting-exe
-executable amm-exe
+executable alw-exe
     main-is:            Main.hs
     --hs-source-dirs:     tests
     hs-source-dirs: lecture
@@ -80,6 +85,19 @@ executable amm-exe
         utilities
     default-language:   Haskell2010
 
+executable mint-exe
+        main-is:            Main.hs
+        --hs-source-dirs:     tests
+        hs-source-dirs: lecture
+        build-depends:
+            base >=4.14 && <4.15,
+            plutus-ledger-api,
+            plutus-tx,
+            plutus-tx-plugin,
+            wspace,
+            utilities
+        default-language:   Haskell2010
+
 test-suite wspace-tests
     import:              common-all-tests
     type:                exitcode-stdio-1.0
@@ -88,11 +106,13 @@ test-suite wspace-tests
     build-depends:
       wspace,
       utilities,
-      hspec
+      hspec,
+      plutus-tx,
+      plutus-ledger-api
     other-modules:
-      CGPlutusUtilsSpec
-      CGTimeSpec
-      ParameterizedVestingSpec
-      VestingSpec
-      DemoSpec
+      -- CGPlutusUtilsSpec
+      -- CGTimeSpec
+      -- ParameterizedVestingSpec
+      -- VestingSpec
+      -- DemoSpec
     default-language:    Haskell2010
