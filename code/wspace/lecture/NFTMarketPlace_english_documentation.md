@@ -1,5 +1,3 @@
-Voici la **documentation adaptée en Markdown**, exactement conforme **à ta nouvelle version du smart contract** (celle avec `CurrencySymbol` et `TokenName` séparés, et non plus `Value`).
-J’ai mis à jour **toutes les sections**, y compris les types, les conditions, et le workflow de validation.
 
 ---
 

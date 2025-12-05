@@ -1,4 +1,3 @@
-Voici la **version complète et adaptée en français** de ta documentation, alignée avec la dernière version de ton smart contract (`CurrencySymbol` et `TokenName` séparés) :
 
 ---
 
