@@ -1,73 +1,95 @@
+Voici la **version complète et adaptée en français** de ta documentation, alignée avec la dernière version de ton smart contract (`CurrencySymbol` et `TokenName` séparés) :
 
-# NFTMarketPlace – Documentation du Smart Contract
+---
+
+# 🛒 **NFTMarketPlace – Documentation du Smart Contract**
 
 ## 📘 Introduction
 
-Ce smart contract implémente un marketplace NFT décentralisé sur Cardano (Plutus V2).  
-Il permet les actions suivantes :
+Ce smart contract implémente un **marketplace NFT décentralisé sur Cardano (Plutus V2)**.
 
-- `Sell` — Mise en vente d’un NFT  
-- `Update` — Mise à jour du prix  
-- `Cancel` — Annulation de la vente  
-- `Buy` — Achat d’un NFT  
+Il prend en charge les actions suivantes :
 
-Toutes les validations sont faites **on-chain**.
+* **`Sell`** — Mettre un NFT en vente
+* **`Update`** — Modifier le prix de vente
+* **`Cancel`** — Annuler la vente
+* **`Buy`** — Acheter un NFT
+
+Toutes les règles sont **validées on-chain**.
 
 ---
 
 ## 📦 Types On-Chain
 
-### ### `MDatum`
+### **MDatum**
 
 ```haskell
-data MDatum = MDatum {
+data MDatum = MDatum{
     price  :: Integer,
-    nft    :: Value,
+    nftCs  :: CurrencySymbol,
+    nftTn  :: TokenName,
     seller :: PubKeyHash
 }
-````
+```
 
-### `MRedeemer`
+| Champ    | Description             |
+| -------- | ----------------------- |
+| `price`  | Prix du NFT en lovelace |
+| `nftCs`  | Currency Symbol du NFT  |
+| `nftTn`  | Token Name du NFT       |
+| `seller` | Clé publique du vendeur |
+
+---
+
+### **MRedeemer**
 
 ```haskell
 data MRedeemer
-  = Sell Integer Value PubKeyHash
+  = Sell Integer CurrencySymbol TokenName PubKeyHash
   | Buy PubKeyHash
   | Update Integer
   | Cancel
 ```
 
-| Redeemer | Description                   |
-| -------- | ----------------------------- |
-| `Sell`   | Mise en vente initiale du NFT |
-| `Buy`    | Achat du NFT                  |
-| `Update` | Mise à jour du prix           |
-| `Cancel` | Annulation de la vente        |
+| Redeemer   | Description                           |
+| ---------- | ------------------------------------- |
+| **Sell**   | Mettre le NFT en vente                |
+| **Buy**    | Achat du NFT                          |
+| **Update** | Mise à jour du prix par le vendeur    |
+| **Cancel** | Annulation de la vente par le vendeur |
 
 ---
 
-# 🛠️ Validation – `mValidator`
+## 🛠️ Validation – `mValidator`
 
-Le validator implémente la logique du marketplace en validant 4 actions.
+Le validator applique la logique du marketplace en validant **les quatre actions**.
 
 ---
 
-# 🟧 1. Action `Sell`
+# 🟧 1. Action **Sell**
 
 ### ✔️ Conditions
 
-* Un seul output retourné au script.
-* Le datum de cet output doit correspondre exactement aux valeurs du redeemer :
+* **Un seul output** doit revenir au script.
+
+* Le datum de cet output doit **correspondre exactement** aux valeurs du redeemer :
 
   * `price`
-  * `nft`
+  * `nftCs`
+  * `nftTn`
   * `seller`
-* L’output doit contenir exactement **1 NFT**.
-* Le vendeur doit signer la transaction.
+
+* L’output doit contenir exactement **1 NFT** :
+
+  ```haskell
+  valueOf (txOutValue o) nftCs nftTn == 1
+  ```
+
+* Le **vendeur doit signer** la transaction.
 
 ---
 
-# 🟦 2. Action `Update`
+# 🟦 2. Action **Update**
 
 ### ✔️ Conditions
 
@@ -76,51 +98,54 @@ Le validator implémente la logique du marketplace en validant 4 actions.
   * le **même NFT**
   * le **même vendeur**
   * le **nouveau prix**
+
 * Le vendeur doit signer la transaction.
+
 * Vérification stricte du `CurrencySymbol` et `TokenName` du NFT.
 
 ---
 
-# 🟥 3. Action `Cancel`
+# 🟥 3. Action **Cancel**
 
 ### ✔️ Conditions
 
-* Aucun output ne doit retourner au script :
+* **Aucun output** ne doit revenir au script :
 
+  ```haskell
+  getContinuingOutputs ctx == []
   ```
-  getContinuingOutputs == []
-  ```
-* Le vendeur doit signer.
-* Le vendeur doit récupérer le NFT dans ses outputs.
-* Le NFT retourné doit correspondre exactement à celui du datum.
+* Le vendeur doit signer la transaction.
+* Le vendeur doit **récupérer le NFT** dans ses outputs.
+* Le NFT retourné doit correspondre exactement au datum initial.
 
 ---
 
-# 🟩 4. Action `Buy`
+# 🟩 4. Action **Buy**
 
 ### ✔️ Conditions
 
-#### **buyerInput**
+#### 🔹 **Input de l’acheteur**
 
-* Le buyer doit signer (`txSignedBy`).
-* Il doit fournir assez d’ADA pour couvrir `price`.
-* Un input doit appartenir à son adresse et contenir assez d’ADA.
+* L’acheteur doit signer (`txSignedBy`).
+* Il doit fournir **au moins le prix en ADA**.
+* Au moins un input doit provenir de son adresse et contenir assez d’ADA.
 
-#### **buyerOutput**
+#### 🔹 **Output de l’acheteur**
 
-* Le buyer doit recevoir **exactement 1 NFT** correspondant à celui dans le datum.
+* L’acheteur doit recevoir **exactement 1 NFT** correspondant au datum.
 
-#### **sellerOutput**
+#### 🔹 **Output du vendeur**
 
-* Le vendeur doit recevoir au moins `price` en ADA.
+* Le vendeur doit recevoir **au moins le prix en ADA**.
 
-#### **scriptOutput**
+#### 🔹 **Output du script**
 
-* Le script ne doit plus avoir d’output :
+* Après l’achat :
 
+  ```haskell
+  getContinuingOutputs ctx == 0
   ```
-  getContinuingOutputs == []
-  ```
+* Aucune sortie résiduelle ne doit rester au script.
 
 ---
 
@@ -130,19 +155,19 @@ Le validator implémente la logique du marketplace en validant 4 actions.
 getNftData :: Value -> [(CurrencySymbol, TokenName)]
 ```
 
-Retourne la liste des tokens **non-ADA** dont la quantité est `1`.
+Retourne la liste des **tokens non-ADA** dont la quantité est **exactement 1**.
 
 ---
 
 ## 🏗️ Compilation / Export
 
-Le script est compilé en fichier `.plutus` via :
+Le validator est compilé et exporté en fichier `.plutus` via :
 
 ```haskell
 getCbor :: IO ()
 ```
 
-Il génère :
+Génère le fichier :
 
 ```
 ./assets/marketplace.plutus
@@ -152,12 +177,12 @@ Il génère :
 
 ## 🔐 Résumé des Garanties
 
-| Action | Garanties                                      |
-| ------ | ---------------------------------------------- |
-| Sell   | Publication correcte du NFT + prix             |
-| Update | Seul le vendeur peut modifier le prix          |
-| Cancel | Le vendeur récupère son NFT et ferme la vente  |
-| Buy    | Achat atomique : NFT → acheteur, ADA → vendeur |
+| Action     | Garanties                                        |
+| ---------- | ------------------------------------------------ |
+| **Sell**   | NFT publié correctement avec le bon prix         |
+| **Update** | Seul le vendeur peut modifier le prix            |
+| **Cancel** | Le vendeur récupère le NFT et ferme la vente     |
+| **Buy**    | Échange atomique : NFT → acheteur, ADA → vendeur |
 
 ---
 
@@ -168,4 +193,5 @@ Il génère :
 * Empêche la déviation des ADA ou du NFT
 * Aucune sortie résiduelle pour `Buy` et `Cancel`
 
-```
+---
+

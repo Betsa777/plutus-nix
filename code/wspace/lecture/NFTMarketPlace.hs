@@ -40,13 +40,14 @@ import Prelude (IO)
 
 data MDatum = MDatum{
     price:: Integer,
-    nft:: Value,
+    nftCs:: CurrencySymbol,
+    nftTn:: TokenName,
     seller:: PubKeyHash
 }
 PlutusTx.makeIsDataIndexed ''MDatum [('MDatum, 0)]
 PlutusTx.makeLift ''MDatum
 
-data MRedeemer = Sell Integer Value PubKeyHash| Buy PubKeyHash | Update Integer | Cancel 
+data MRedeemer = Sell Integer CurrencySymbol TokenName PubKeyHash| Buy PubKeyHash | Update Integer | Cancel 
 PlutusTx.makeIsDataIndexed ''MRedeemer [
                               ('Sell, 0),
                               ('Buy,1),
@@ -58,25 +59,25 @@ PlutusTx.makeLift ''MRedeemer
 mValidator:: MDatum -> MRedeemer -> ScriptContext -> Bool 
 mValidator mDatum mRedeemer ctx = 
     case mRedeemer of
-        Sell price' nft' seller' -> case getContinuingOutputs ctx of 
+        Sell price' nftCs' nftTn' seller' -> case getContinuingOutputs ctx of 
                                           -- check in the script outout that the datum is correct
                                           --  match the redeemer values
                                           -- and verify that the seller signed the transaction
                                      [o] -> case   txOutDatum o  of
                                               OutputDatum (Datum datum) -> let d = (PlutusTx.unsafeFromBuiltinData datum) :: MDatum 
-                                                                               [(cs,tn)] = getNftData (txOutValue o)
                                                                             in (price d) == price' &&
-                                                                               (nft d) == nft' &&
+                                                                               (nftCs d) == nftCs' &&
+                                                                               (nftTn d) == nftTn' &&
                                                                                (seller d) == seller' &&
-                                                                               valueOf (txOutValue o) cs tn == 1 && 
+                                                                               valueOf (txOutValue o) nftCs' nftTn' == 1 && 
                                                                                txSignedBy (scriptContextTxInfo ctx) seller'
                                               OutputDatumHash dHash -> case findDatum dHash (scriptContextTxInfo ctx) of 
                                                                         Just (Datum datum) -> let d = PlutusTx.unsafeFromBuiltinData datum :: MDatum 
-                                                                                                  [(cs,tn)] = getNftData (txOutValue o)
                                                                                                in (price d) == price' &&
-                                                                                                  (nft d) == nft' &&
+                                                                                                  (nftCs d) == nftCs' &&
+                                                                                                  (nftTn d) == nftTn' &&
                                                                                                   (seller d) == seller' &&
-                                                                                                  valueOf (txOutValue o) cs tn == 1 &&
+                                                                                                  valueOf (txOutValue o) nftCs' nftTn' == 1 &&
                                                                                                   txSignedBy (scriptContextTxInfo ctx) seller'
                                                                         Nothing    -> False
                                                                        
@@ -89,23 +90,22 @@ mValidator mDatum mRedeemer ctx =
                         -- new price and the same nft and seller stay the same
                         [o] -> case   txOutDatum o  of
                                  OutputDatum (Datum datum) -> let d = (PlutusTx.unsafeFromBuiltinData datum) :: MDatum 
-                                                                  [(cs,tn)] = getNftData (txOutValue o)
-                                                                  [(cs',tn')] = getNftData (nft mDatum)
                                                                in (price d) == newPrice &&
-                                                                  (nft d) == (nft mDatum) &&
+                                                                  (nftCs d) == (nftCs mDatum) &&
+                                                                  (nftTn d) == (nftTn mDatum) &&
                                                                   (seller d) == (seller mDatum) &&
-                                                                  txSignedBy (scriptContextTxInfo ctx) (seller mDatum) &&
-                                                                  cs == cs' && tn == tn' 
+                                                                  txSignedBy (scriptContextTxInfo ctx) (seller mDatum) 
+                                                                  
 
                                  OutputDatumHash dHash -> case findDatum dHash (scriptContextTxInfo ctx) of 
                                                            Just (Datum datum) -> let d = PlutusTx.unsafeFromBuiltinData datum :: MDatum 
-                                                                                     [(cs,tn)] = getNftData (txOutValue o)
-                                                                                     [(cs',tn')] = getNftData (nft mDatum)
+                            
                                                                                   in (price d) == newPrice &&
-                                                                                     (nft d) == (nft mDatum) &&
+                                                                                     (nftCs d) == (nftCs mDatum) &&
+                                                                                     (nftTn d) == (nftTn mDatum) &&
                                                                                      (seller d) == (seller mDatum) &&
-                                                                                     txSignedBy (scriptContextTxInfo ctx) (seller mDatum) &&
-                                                                                     cs == cs' && tn == tn' 
+                                                                                     txSignedBy (scriptContextTxInfo ctx) (seller mDatum) 
+                                                                                     
                                                            Nothing    -> False
                                  NoOutputDatum -> False
                         _ -> False
@@ -116,8 +116,7 @@ mValidator mDatum mRedeemer ctx =
                                   sellerOutputsValues = pubKeyOutputsAt (seller mDatum) (scriptContextTxInfo ctx)
                               in sellerSignature && 
                                 any (\v -> let nftList = getNftData v
-                                               [(cs',tn')] = getNftData (nft mDatum)
-                                             in (cs',tn') `elem` nftList) sellerOutputsValues
+                                             in ((nftCs mDatum),nftTn mDatum) `elem` nftList) sellerOutputsValues
                         _  -> False
 
         Buy buyer -> 
@@ -149,8 +148,7 @@ mValidator mDatum mRedeemer ctx =
               let txOutputs = txInfoOutputs (scriptContextTxInfo ctx)
                   txSign = txSignedBy (scriptContextTxInfo ctx) buyer
                   buyerOutputValue = pubKeyOutputsAt buyer (scriptContextTxInfo ctx)
-                  [(cs,tn)] = getNftData (nft mDatum)
-                  goodValue = any (\v -> valueOf v cs tn == 1) buyerOutputValue
+                  goodValue = any (\v -> valueOf v (nftCs mDatum) (nftTn mDatum) == 1) buyerOutputValue
                 in  txSign && goodValue
             
              -- Check that the seller receives the correct ada amount in one of his outputs

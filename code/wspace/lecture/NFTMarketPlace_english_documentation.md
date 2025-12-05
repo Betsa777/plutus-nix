@@ -1,171 +1,219 @@
-# NFTMarketPlace – Smart Contract Documentation
+Voici la **documentation adaptée en Markdown**, exactement conforme **à ta nouvelle version du smart contract** (celle avec `CurrencySymbol` et `TokenName` séparés, et non plus `Value`).
+J’ai mis à jour **toutes les sections**, y compris les types, les conditions, et le workflow de validation.
+
+---
+
+# 🛒 **NFTMarketPlace – Smart Contract Documentation (Updated for Current Code)**
 
 ## 📘 Introduction
 
-This smart contract implements a decentralized NFT marketplace on **Cardano (Plutus V2)**.
-It supports the following actions:
+This Plutus V2 smart contract implements a decentralized **NFT Marketplace on Cardano**.
+
+It supports the following marketplace actions:
 
 * **`Sell`** — List an NFT for sale
 * **`Update`** — Update the sale price
 * **`Cancel`** — Cancel the sale
 * **`Buy`** — Purchase the NFT
 
-All validations are performed **on-chain**.
+All rules are enforced **on-chain inside the validator**.
 
 ---
 
-## 📦 On-Chain Types
+# 📦 On-Chain Types
 
-### `MDatum`
+## **MDatum**
+
+Your updated datum type is:
 
 ```haskell
-data MDatum = MDatum {
-    price  :: Integer,
-    nft    :: Value,
+data MDatum = MDatum{
+    price :: Integer,
+    nftCs :: CurrencySymbol,
+    nftTn :: TokenName,
     seller :: PubKeyHash
 }
 ```
 
-### `MRedeemer`
+### **Meaning**
+
+| Field    | Description                   |
+| -------- | ----------------------------- |
+| `price`  | Price of the NFT in lovelace  |
+| `nftCs`  | NFT Currency Symbol           |
+| `nftTn`  | NFT Token Name                |
+| `seller` | Public key hash of the seller |
+
+---
+
+## **MRedeemer**
+
+Your updated redeemer type is:
 
 ```haskell
 data MRedeemer
-  = Sell Integer Value PubKeyHash
+  = Sell Integer CurrencySymbol TokenName PubKeyHash
   | Buy PubKeyHash
   | Update Integer
   | Cancel
 ```
 
-### Redeemer Description
+### **Redeemer Descriptions**
 
-| Redeemer   | Description               |
-| ---------- | ------------------------- |
-| **Sell**   | Initial NFT listing       |
-| **Buy**    | Purchase of the NFT       |
-| **Update** | Modification of the price |
-| **Cancel** | Cancellation of the sale  |
-
----
-
-## 🛠️ Validation – `mValidator`
-
-The validator enforces the marketplace logic by validating **four actions**.
+| Redeemer   | Description                   |
+| ---------- | ----------------------------- |
+| **Sell**   | Used to list the NFT for sale |
+| **Buy**    | Buyer purchases the NFT       |
+| **Update** | Seller changes the price      |
+| **Cancel** | Seller cancels the listing    |
 
 ---
 
-## 🟧 1. Action **Sell**
+# 🛠️ Validation Logic (`mValidator`)
 
-### ✔️ Conditions
+The validator enforces the sale logic for each action.
 
-* A **single output** must return to the script.
-* The datum of that output must **exactly match** the fields from the redeemer:
+---
+
+# 🟧 **1. Sell**
+
+When the seller lists an NFT.
+
+### ✔️ Required Conditions
+
+* There must be **exactly one continuing output**.
+* The output datum must **exactly match** the redeemer fields:
 
   * `price`
-  * `nft`
+  * `nftCs`
+  * `nftTn`
   * `seller`
-* The output must contain **exactly 1 NFT**.
-* The **seller must sign** the transaction.
+* The output must contain **1 NFT**:
 
----
-
-## 🟦 2. Action **Update**
-
-### ✔️ Conditions
-
-* The unique script output must contain:
-
-  * The **same NFT**
-  * The **same seller**
-  * The **new price**
+  ```haskell
+  valueOf (txOutValue o) nftCs nftTn == 1
+  ```
 * The seller must sign the transaction.
-* Strict verification of the NFT’s `CurrencySymbol` and `TokenName`.
 
 ---
 
-## 🟥 3. Action **Cancel**
+# 🟦 **2. Update**
 
-### ✔️ Conditions
+When the seller changes the price of the NFT.
 
-* **No output** must return to the script:
+### ✔️ Required Conditions
 
-```haskell
-getContinuingOutputs == []
-```
+* Exactly **one output back to the script**.
+* The datum of that output must contain:
 
-* The seller must sign the transaction.
-* The seller must **receive the NFT back** in their outputs.
-* The returned NFT must **exactly match** the NFT stored in the datum.
+  * **New `price`**
+  * **Same `nftCs`**
+  * **Same `nftTn`**
+  * **Same `seller`**
+* Only the seller can update the price:
 
----
-
-## 🟩 4. Action **Buy**
-
-### ✔️ Conditions
-
-#### 🔹 Buyer Input
-
-* The buyer must sign the transaction (`txSignedBy`).
-* The buyer must provide **enough ADA** to cover the price.
-* At least one input must come from the buyer’s own address and contain sufficient ADA.
-
-#### 🔹 Buyer Output
-
-* The buyer must receive **exactly 1 NFT** matching the datum.
-
-#### 🔹 Seller Output
-
-* The seller must receive **at least `price` ADA**.
-
-#### 🔹 Script Output
-
-* No output must remain at the script address:
-
-```haskell
-getContinuingOutputs == []
-```
+  ```haskell
+  txSignedBy info (seller mDatum)
+  ```
 
 ---
 
-## 🔧 Utility Function: `getNftData`
+# 🟥 **3. Cancel**
+
+The seller cancels the listing and wants the NFT back.
+
+### ✔️ Required Conditions
+
+* No continuing script outputs:
+
+  ```haskell
+  getContinuingOutputs ctx == []
+  ```
+* Seller must sign.
+* Seller must receive the NFT back in one of their outputs.
+* NFT must match:
+
+  * same `CurrencySymbol`
+  * same `TokenName`
+
+---
+
+# 🟩 **4. Buy**
+
+Atomic exchange: the buyer receives the NFT, seller receives ADA.
+
+### ✔️ Required Conditions
+
+### 🔹 **Buyer Input**
+
+* Buyer must sign.
+* Buyer must provide **at least `price` ADA**.
+* At least one input must:
+
+  * belong to the buyer
+  * contain enough ADA
+
+### 🔹 **Buyer Output**
+
+* Buyer must receive exactly **1 unit of the NFT**:
+
+  ```haskell
+  valueOf v nftCs nftTn == 1
+  ```
+
+### 🔹 **Seller Output**
+
+* Seller must receive **at least the price in ADA**.
+
+### 🔹 **Script Output**
+
+* After the purchase:
+
+  ```haskell
+  getContinuingOutputs ctx == 0
+  ```
+
+No listing must remain on-chain.
+
+---
+
+# 🔧 Utility Function
+
+### `getNftData`
+
+You use this to detect whether a given output contains NFTs the seller should recover:
 
 ```haskell
 getNftData :: Value -> [(CurrencySymbol, TokenName)]
 ```
 
-Returns a list of all non-ADA tokens present **with quantity = 1**.
+It returns all **non-ADA assets with quantity = 1**.
 
 ---
 
-## 🏗️ Compilation / Export
+# 🏗️ Compilation / Export
 
-The script is compiled into a `.plutus` file using:
+The validator is compiled and exported as:
 
 ```haskell
 getCbor :: IO ()
 ```
 
-This generates:
+Output file:
 
-```bash
+```
 ./assets/marketplace.plutus
 ```
 
 ---
 
-## 🔐 Guarantee Summary
+# 🔐 Security Guarantees
 
-| Action     | Guarantees                                          |
-| ---------- | --------------------------------------------------- |
-| **Sell**   | Correct NFT listing and price                       |
-| **Update** | Only the seller can update the price                |
-| **Cancel** | The seller retrieves the NFT and closes the listing |
-| **Buy**    | Atomic swap: NFT → buyer, ADA → seller              |
+| Action     | Guarantees                                                  |
+| ---------- | ----------------------------------------------------------- |
+| **Sell**   | Ensures correct listing matching redeemer; seller signs     |
+| **Update** | Only seller can modify price; NFT cannot change             |
+| **Cancel** | NFT must return to seller; script state cleared             |
+| **Buy**    | Atomic swap: NFT → buyer, ADA → seller; no leftover outputs |
 
 ---
-
-## 🛡️ Security
-
-* Signature verification (`txSignedBy`)
-* Strict NFT validation (CurrencySymbol + TokenName)
-* Prevents NFT or ADA misdirection
-* No leftover script outputs for `Buy` and `Cancel`
