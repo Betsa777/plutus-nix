@@ -1,0 +1,124 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+
+module AMM where
+
+-- import Plutus.V1.Ledger.Api ()
+import Plutus.V1.Ledger.Value
+  ( CurrencySymbol (..),
+    TokenName (..),
+    adaSymbol,
+    adaToken,
+    flattenValue,
+    symbols,
+    valueOf,
+  )
+import Plutus.V2.Ledger.Api
+  ( Credential (..),
+    PubKeyHash,
+    ScriptContext (..),
+    addressCredential,
+    scriptContextTxInfo,
+    txInfoOutputs,
+    txOutAddress,
+    txOutValue,
+  )
+import Plutus.V2.Ledger.Contexts (getContinuingOutputs)
+import PlutusTx
+import PlutusTx.Prelude as P
+
+newtype TokenA = TokenA BuiltinByteString
+
+PlutusTx.makeIsDataIndexed ''TokenA [('TokenA, 0)]
+PlutusTx.makeLift ''TokenA
+
+newtype TokenB = TokenB BuiltinByteString
+
+PlutusTx.makeIsDataIndexed ''TokenB [('TokenB, 0)]
+PlutusTx.makeLift ''TokenB
+
+type LPPKH = PubKeyHash
+
+type Amount = Integer
+
+type LPTokenNumber = Integer
+
+type AdaReserve = Integer
+
+type TokenReserve = Integer
+
+type LPTokenCurrencySymbol = CurrencySymbol
+
+type LPTokenName = TokenName
+
+data Redeemer
+  = AddLiquidity Amount Amount AdaReserve TokenReserve LPTokenNumber LPPKH LPTokenCurrencySymbol LPTokenName
+  | Swap TokenA TokenB Amount LPPKH
+  | RemoveLiquidity TokenA TokenB Amount LPPKH
+
+PlutusTx.makeIsDataIndexed
+  ''Redeemer
+  [ ('AddLiquidity, 0),
+    ('Swap, 1),
+    ('RemoveLiquidity, 2)
+  ]
+
+{-# INLINEABLE ammValidator #-}
+ammValidator :: Redeemer -> ScriptContext -> Bool
+ammValidator r ctx =
+  case r of
+    AddLiquidity adaAmount tokenAmount adaR tokR lpTokNumb lpPKH lpCurrSymb lpTokName ->
+      addLiquidity adaAmount tokenAmount adaR tokR lpTokNumb lpPKH lpCurrSymb lpTokName ctx
+    _ -> True
+  where
+    addLiquidity :: Amount -> Amount -> AdaReserve -> TokenReserve -> LPTokenNumber -> LPPKH -> LPTokenCurrencySymbol -> LPTokenName -> ScriptContext -> Bool
+    addLiquidity adaAmount tokenAmount adaR tokR lpTokNumb lpPKH lpCurrSymb lpTokName ctx =
+      if adaAmount <= 0 || tokenAmount <= 0
+        then False
+        else
+          -- au cas ou il n'ya pas de reserve du token ajouté
+          if tokR == 0
+            then
+              let tokensForLp = adaR + adaAmount
+               in finalizeAdding adaAmount tokenAmount tokensForLp lpPKH lpCurrSymb lpTokName ctx
+            else
+              let tokensForLp = P.divide (lpTokNumb P.* adaAmount) adaR
+               in finalizeAdding adaAmount tokenAmount tokensForLp lpPKH lpCurrSymb lpTokName ctx
+
+    finalizeAdding :: Amount -> Amount -> LPTokenNumber -> LPPKH -> LPTokenCurrencySymbol -> LPTokenName -> ScriptContext -> Bool
+    finalizeAdding adaAmount tokenAmount tokensForLp lpPKH lpCurrSymb lpTokName ctx =
+      case getContinuingOutputs ctx of
+        [o] ->
+          -- scriptOuput1 correspond à l'output verifiant que le script a vraiment
+          -- recu adaAmount
+          let scriptOuput1 = (valueOf (txOutValue o) adaSymbol adaToken) == adaAmount
+              -- flattenValue:: Value -> [(CurrencySymbol,TokenName,Integer)]
+              --     -- txOutValue champ contenant la Value dans TxOut
+              --     -- scriptOuput2 correspond à l'output verifiant que le script a vraiment
+              --     -- recu tokenAmount
+              scriptOuput2 =
+                P.any
+                  ( \(currSymb, tokN, amount) ->
+                      (currSymb P./= adaSymbol)
+                        P.&& (amount P.== tokenAmount)
+                  )
+                  (flattenValue (txOutValue o))
+
+              --     -- ownerOuput correspond à l'output correspondant
+              --     -- a celui dans lequel le LP a recu les LP tokens ou tokensForLp
+              ownerOuput =
+                P.any
+                  ( \o ->
+                      ((valueOf (txOutValue o) lpCurrSymb lpTokName) == tokensForLp)
+                        P.&& ( case addressCredential (txOutAddress o) of
+                                 PubKeyCredential ownerPKH -> ownerPKH P.== lpPKH
+                                 _ -> False
+                             )
+                  )
+                  (txInfoOutputs (scriptContextTxInfo ctx))
+           in (scriptOuput1 P.&& scriptOuput2 P.&& ownerOuput)
+        _ -> False

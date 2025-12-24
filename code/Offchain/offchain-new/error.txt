@@ -1,0 +1,77 @@
+validator address is  addr_test1wp2kk2tayh0nfwtjz4ll6aetdt9fm2r2q7pwqf6zadnhrnqq9yw50
+wallet address is  addr_test1qzcldau02dlu964a9y7666yhl2va4v40j0tur66h2m7l44vcnp8awaa86vc7us4qdajvd8eq2dvjnul5pwk79gv5m8xqxj4g56
+Policy ID: ea055095c321927041cc6baa0076efeef9f3b60a21b1998b9da79c67
+UTxOs at script: [
+  {
+    txHash: '0b358f3b4e1d8577eba6e361422cc97ea2b8dec2dbd7a4db8f9ae3ae8b3427b0',
+    outputIndex: 0,
+    assets: {
+      lovelace: 5000000n,
+      ea055095c321927041cc6baa0076efeef9f3b60a21b1998b9da79c6757494d53544f4b454e: 100000n
+    },
+    address: 'addr_test1wp2kk2tayh0nfwtjz4ll6aetdt9fm2r2q7pwqf6zadnhrnqq9yw50',
+    datumHash: undefined,
+    datum: '01',
+    scriptRef: undefined
+  },
+  {
+    txHash: 'd170b365e3072dc4817bbe76ac2b5285fb7b9a98f2b3098ede14b3d78fb0efd0',
+    outputIndex: 0,
+    assets: {
+      lovelace: 9000000n,
+      ea055095c321927041cc6baa0076efeef9f3b60a21b1998b9da79c6757494d53544f4b454e: 5100000n
+    },
+    address: 'addr_test1wp2kk2tayh0nfwtjz4ll6aetdt9fm2r2q7pwqf6zadnhrnqq9yw50',
+    datumHash: undefined,
+    datum: '01',
+    scriptRef: undefined
+  }
+]
+ADA reserve: 14000000n
+WIMS reserve: 5200000n
+tokens to mint (lptokens is  0n
+{ pkhHex: 'b1f6f78f537fc2eabd293dad6897fa99dab2af93d7c1eb5756fdfad5' }
+Filtered user UTxOs: [
+  {
+    txHash: 'd170b365e3072dc4817bbe76ac2b5285fb7b9a98f2b3098ede14b3d78fb0efd0',
+    outputIndex: 1,
+    assets: {
+      lovelace: 8718578525n,
+      '7aa22d169026522e97bcae56b9f142de108e5891f2d3d3f34bd2e376426574736f546f6b656e73': 1000n,
+      '7aa22d169026522e97bcae56b9f142de108e5891f2d3d3f34bd2e3764c50544f4b454e': 22451155n,
+      '7aa22d169026522e97bcae56b9f142de108e5891f2d3d3f34bd2e3764d79417765736f6d65546f6b656e': 1000n,
+      ea055095c321927041cc6baa0076efeef9f3b60a21b1998b9da79c674c50544f4b454e: 1000019500000n,
+      ea055095c321927041cc6baa0076efeef9f3b60a21b1998b9da79c6757494d53544f4b454e: 100017250000n
+    },
+    address: 'addr_test1qzcldau02dlu964a9y7666yhl2va4v40j0tur66h2m7l44vcnp8awaa86vc7us4qdajvd8eq2dvjnul5pwk79gv5m8xqxj4g56',
+    datumHash: undefined,
+    datum: undefined,
+    scriptRef: undefined
+  }
+]
+scriptUtxos  [
+  {
+    txHash: '0b358f3b4e1d8577eba6e361422cc97ea2b8dec2dbd7a4db8f9ae3ae8b3427b0',
+    outputIndex: 0,
+    assets: {
+      lovelace: 5000000n,
+      ea055095c321927041cc6baa0076efeef9f3b60a21b1998b9da79c6757494d53544f4b454e: 100000n
+    },
+    address: 'addr_test1wp2kk2tayh0nfwtjz4ll6aetdt9fm2r2q7pwqf6zadnhrnqq9yw50',
+    datumHash: undefined,
+    datum: '01',
+    scriptRef: undefined
+  },
+  {
+    txHash: 'd170b365e3072dc4817bbe76ac2b5285fb7b9a98f2b3098ede14b3d78fb0efd0',
+    outputIndex: 0,
+    assets: {
+      lovelace: 9000000n,
+      ea055095c321927041cc6baa0076efeef9f3b60a21b1998b9da79c6757494d53544f4b454e: 5100000n
+    },
+    address: 'addr_test1wp2kk2tayh0nfwtjz4ll6aetdt9fm2r2q7pwqf6zadnhrnqq9yw50',
+    datumHash: undefined,
+    datum: '01',
+    scriptRef: undefined
+  }
+]

@@ -1,0 +1,50 @@
+{
+  "$id": "amm-validator",
+  "$schema": "https://cips.cardano.org/cips/cip57/schemas/plutus-blueprint.json",
+  "$vocabulary": {
+    "https://cips.cardano.org/cips/cip57": true,
+    "https://json-schema.org/draft/2020-12/vocab/applicator": true,
+    "https://json-schema.org/draft/2020-12/vocab/core": true,
+    "https://json-schema.org/draft/2020-12/vocab/validation": true
+  },
+  "preamble": {
+    "title": "Always Validator",
+    "description": "Blueprint for a Plutus script validating auction transactions",
+    "version": "1.0.0",
+    "plutusVersion": "v2",
+    "license": "MIT"
+  },
+  "validators": [
+    {
+      "title": "Auction Validator",
+      "description": "Plutus script validating auction transactions",
+      "redeemer": {
+        "title": "Redeemer",
+        "description": "Redeemer for the amm validator",
+        "purpose": "spend",
+        "schema": {
+          "$ref": "#/definitions/Unit"
+        }
+      },
+      "parameters": [
+        {
+          "title": "Parameters",
+          "description": "Compile-time validator parameters",
+          "purpose": "spend",
+          "schema": {
+            "$ref": "#/definitions/Unit"
+          }
+        }
+      ],
+      "compiledCode": "582201010022255333573466e1cdd68019bad0021149844c98cd5ce24903505435008001",
+      "hash": "a689ef85f5ad3a2aeaebb9fce34c7c97f4a6e0ec45fb08bddf0b3183"
+    }
+  ],
+  "definitions": {
+    "Unit": {
+      "dataType": "constructor",
+      "fields": [],
+      "index": 0
+    }
+  }
+}

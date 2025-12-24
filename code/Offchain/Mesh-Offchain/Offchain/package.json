@@ -1,0 +1,28 @@
+{
+  "name": "vote-interface",
+  "version": "1.0.0",
+  "description": "an interface for election",
+  "main": "index.js",
+  "type": "module",
+  "types": "types.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "  tsx main.ts",
+    "dev": "node --import=tsx --watch src/index.ts",
+    "build": "tsc"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@meshsdk/common": "^1.9.0-beta.65",
+    "@meshsdk/core": "^1.9.0-beta.65",
+    "@meshsdk/wallet": "^1.9.0-beta.65",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/dotenv": "^6.1.1",
+    "@types/node": "^22.13.11",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

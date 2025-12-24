@@ -59,12 +59,14 @@ library
       -- Mint
       -- ParameterizedVesting
       -- Vesting
-      AMM
+      -- AMM
       --Mint
       -- AMMU
       --AlwaysS
        --DatRed
-       NFTMarketPlace
+      --  NFTMarketPlace
+      --Dep
+      FundGovernanc
     build-depends:
       base >=4.14 && <5,
       time,
